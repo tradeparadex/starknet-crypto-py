@@ -12,7 +12,7 @@ build:
 	@echo "🔨 Building..."
 	RUSTFLAGS="-C target-cpu=haswell" maturin build -i 3.9 --sdist --release --zig --strip \
     --target x86_64-unknown-linux-gnu \
-    --compatibility manylinux_2_24
+    --compatibility manylinux_2_28
 
 sdist:
 	@echo "🔨 Building..."
