@@ -2,6 +2,28 @@
 
 Python binding for the [starknet-crypto](https://github.com/xJonathanLEI/starknet-rs/tree/master/starknet-crypto) rust library.
 
+## Examples
+
+```python
+from starknet_crypto_py import get_public_key, pedersen_hash, sign, verify
+
+DEFAULT_K = 32
+EC_ORDER = 0x800000000000010FFFFFFFFFFFFFFFFB781126DCAE7B2321E66A241ADC64D2F
+PRIVATE_KEY = "0x..." # Enter starknet private key here
+
+public_key = get_public_key(PRIVATE_KEY)
+print(public_key)
+
+msg_hash = pedersen_hash(first, second)
+print(msg_hash)
+
+r, s = sign(private_key=PRIVATE_KEY, msg_hash=msg_hash, k=DEFAULT_K)
+print(r, s)
+
+w = pow(s, -1, EC_ORDER) # Inverse modulus
+is_valid = verify(public_key=public_key, msg_hash=msg_hash, r=r, s=w)
+```
+
 ## Commands
 
 ```bash
