@@ -3,6 +3,7 @@ use starknet_crypto::{
     FieldElement,
     pedersen_hash as pedersen_hash_rs,
     sign as sign_rs,
+    rfc6979_generate_k as rfc6979_generate_k_rs,
 };
 
 fn _fe_from_str(s: &str) -> FieldElement {
@@ -25,10 +26,11 @@ fn rs_pedersen_hash(left: &str, right: &str) -> PyResult<String> {
 }
 
 #[pyfunction]
-fn rs_sign(priv_key: &str, msg_hash: &str, k: &str) -> PyResult<(String, String)> {
+fn rs_sign(priv_key: &str, msg_hash: &str, seed: &str) -> PyResult<(String, String)> {
     let msg_hash: FieldElement = _fe_from_str(msg_hash);
     let priv_key: FieldElement = _fe_from_str(priv_key);
-    let k: FieldElement = _fe_from_str(k);
+    let seed: FieldElement = _fe_from_str(seed);
+    let k: FieldElement = rfc6979_generate_k_rs(&msg_hash, &priv_key, Some(&seed));
     let hash: starknet_crypto::ExtendedSignature = sign_rs(&priv_key, &msg_hash, &k).unwrap();
     let r: String = hash.r.to_string();
     let s: String = hash.s.to_string();

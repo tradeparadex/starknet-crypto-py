@@ -1,3 +1,5 @@
+from typing import Optional
+
 from starknet_crypto_py.starknet_crypto_py import (
     rs_get_public_key,
     rs_pedersen_hash,
@@ -14,8 +16,8 @@ def pedersen_hash(first: int, second: int) -> int:
     return int(rs_pedersen_hash(hex(first), hex(second)))
 
 
-def sign(private_key: int, msg_hash: int, k: int) -> tuple[int, int]:
-    (r, s) = rs_sign(hex(private_key), hex(msg_hash), hex(k))
+def sign(private_key: int, msg_hash: int, seed: Optional[int] = 32) -> tuple[int, int]:
+    (r, s) = rs_sign(hex(private_key), hex(msg_hash), hex(seed))
     return (int(r), int(s))
 
 

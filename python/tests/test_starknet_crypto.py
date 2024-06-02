@@ -53,23 +53,7 @@ def test_pedersen_hash(first: int, second: int, msg_hash: int) -> None:
     assert pedersen_hash(first, second) == msg_hash
 
 
-def test_sign() -> None:
-    (r, s) = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, k=32)
-    assert (
-        r
-        == 1977703130303461992863803129734853218488251484396280000763960303272760326570
-    )
-    assert (
-        s
-        == 2724513698511531566681485513041952149126560643963807389721140128271700252419
-    )
-
-
-def test_verify() -> None:
-    is_valid = verify(
-        public_key=TEST_PUBLIC_KEY,
-        msg_hash=4660,
-        r=1977703130303461992863803129734853218488251484396280000763960303272760326570,
-        s=2724513698511531566681485513041952149126560643963807389721140128271700252419,
-    )
+def test_sign_and_verify() -> None:
+    (r, s) = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660)
+    is_valid = verify(public_key=TEST_PUBLIC_KEY, msg_hash=4660, r=r, s=s)
     assert is_valid
