@@ -14,8 +14,8 @@ def pedersen_hash(first: int, second: int) -> int:
     return int(rs_pedersen_hash(hex(first), hex(second)))
 
 
-def sign(private_key: int, msg_hash: int, k: int) -> tuple[int, int]:
-    (r, s) = rs_sign(hex(private_key), hex(msg_hash), hex(k))
+def sign(private_key: int, msg_hash: int, seed: int) -> tuple[int, int]:
+    (r, s) = rs_sign(hex(private_key), hex(msg_hash), hex(seed))
     return (int(r), int(s))
 
 
