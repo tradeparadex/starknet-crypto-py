@@ -54,6 +54,6 @@ def test_pedersen_hash(first: int, second: int, msg_hash: int) -> None:
 
 
 def test_sign_and_verify() -> None:
-    (r, s) = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660)
+    (r, s) = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
     is_valid = verify(public_key=TEST_PUBLIC_KEY, msg_hash=4660, r=r, s=s)
     assert is_valid

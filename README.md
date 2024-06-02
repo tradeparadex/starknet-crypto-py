@@ -16,7 +16,7 @@ print(public_key)
 msg_hash = pedersen_hash(first, second)
 print(msg_hash)
 
-r, s = sign(private_key=PRIVATE_KEY, msg_hash=msg_hash)
+r, s = sign(private_key=PRIVATE_KEY, msg_hash=msg_hash, seed=123)
 print(r, s)
 
 is_valid = verify(public_key=public_key, msg_hash=msg_hash, r=r, s=s)
