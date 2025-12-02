@@ -49,7 +49,7 @@ fn rs_verify(public_key: &str, msg_hash: &str, r: &str, s: &str) -> PyResult<boo
 
 // A Python module implemented in Rust
 #[pymodule]
-fn starknet_crypto_py(_py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn starknet_crypto_py(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(rs_pedersen_hash, m)?)?;
     m.add_function(wrap_pyfunction!(rs_sign, m)?)?;
     m.add_function(wrap_pyfunction!(rs_verify, m)?)?;
