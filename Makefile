@@ -1,3 +1,7 @@
+.PHONY: default clean check build sdist develop test
+
+default: build
+
 clean:
 	@echo "🧹 Cleaning..."
 	cargo clean
@@ -5,25 +9,26 @@ clean:
 
 check:
 	@echo "🩺 Checking..."
+	cargo fmt --check
+	poetry run ruff check .
 	cargo check
 	poetry check
 
 build:
 	@echo "🔨 Building..."
-	RUSTFLAGS="-C target-cpu=haswell" maturin build -i 3.10 --sdist --release --strip \
-    --target x86_64-apple-darwin \
-    --compatibility manylinux_2_28
+	poetry run maturin build -i 3.10 --sdist --release --strip \
+		--compatibility manylinux_2_28
 
 sdist:
 	@echo "🔨 Building..."
-	maturin sdist
+	poetry run maturin sdist
 
 develop:
 	@echo "⛏️ Building..."
-	maturin develop
+	poetry run maturin develop
 
-test:
+test: develop
 	@echo "🧪 Testing code: Running pytest"
-  # cargo test
+# 	cargo test
 	poetry run pytest -vv
-	mypy .
+	poetry run mypy .

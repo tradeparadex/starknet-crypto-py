@@ -4,28 +4,25 @@ build-backend = "maturin"
 
 [project]
 name = "starknet-crypto-py"
-requires-python = ">=3.10,<3.14"
+version = "0.3.1"
+description = "starknet-crypto python module"
+authors = [{name ="Paradex"}]
+license = "MIT"
+requires-python = ">=3.10,<4.0"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dynamic = ["version"]
+readme = "README.md"
+dynamic = ["dependencies"]
 
 [tool.maturin]
 python-source = "python"
 features = ["pyo3/extension-module"]
 
-[tool.poetry]
-name = "starknet-crypto-py"
-version = "0.3.0"
-description = "starknet-crypto python module"
-authors = ["Paradex"]
-license = "MIT"
-readme = "README.md"
-
 [tool.poetry.dependencies]
-python = ">=3.10,<3.14"
+python = ">=3.10,<4.0"
 ziglang = "^0.15.1"
 
 [tool.poetry.group.dev.dependencies]
@@ -34,7 +31,6 @@ maturin = "^1.10.2"
 mypy = "^1.19.0"
 ruff = "^0.14.7"
 ziglang = "^0.15.1"
-tox = "^4.32.0"
 
 [tool.mypy]
 strict = true
