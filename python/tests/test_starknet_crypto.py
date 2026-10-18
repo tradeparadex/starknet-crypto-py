@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from starknet_crypto_py import get_public_key, pedersen_hash, sign, verify
@@ -15,6 +16,8 @@ TEST_PRIVATE_KEY = (
 TEST_PUBLIC_KEY = (
     1673729114437878727516854592246827335452530539480870878860719335128967723895
 )
+# Starknet field prime: the smallest value that is not a valid field element.
+FIELD_PRIME = 2**251 + 17 * 2**192 + 1
 
 
 def test_get_public_key() -> None:
@@ -62,7 +65,7 @@ def test_pedersen_hash(first: int, second: int, msg_hash: int) -> None:
 
 
 def test_sign_and_verify() -> None:
-    (r, s) = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
     is_valid = verify(public_key=TEST_PUBLIC_KEY, msg_hash=4660, r=r, s=s)
     assert is_valid
 
@@ -80,6 +83,57 @@ def test_sign_and_verify() -> None:
         (rs_verify, ("0x1", "0x1", "0x1", "0xzz")),
     ],
 )
-def test_invalid_hex_raises_value_error(fn: Callable[..., object], args: tuple[str, ...]) -> None:
+def test_invalid_hex_raises_value_error(
+    fn: Callable[..., object], args: tuple[str, ...]
+) -> None:
     with pytest.raises(ValueError, match="invalid field element"):
         fn(*args)
+
+
+def test_sign_is_deterministic() -> None:
+    first = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    second = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    assert first == second
+
+
+def test_verify_rejects_wrong_message() -> None:
+    r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    assert not verify(public_key=TEST_PUBLIC_KEY, msg_hash=4661, r=r, s=s)
+
+
+def test_verify_rejects_tampered_signature() -> None:
+    r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    assert not verify(public_key=TEST_PUBLIC_KEY, msg_hash=4660, r=r, s=s + 1)
+
+
+@pytest.mark.parametrize("value", [-1, FIELD_PRIME])
+def test_out_of_range_input_raises_value_error(value: int) -> None:
+    with pytest.raises(ValueError, match="invalid field element"):
+        pedersen_hash(value, 0)
+    with pytest.raises(ValueError, match="invalid field element"):
+        get_public_key(value)
+
+
+def test_sign_rejects_message_hash_out_of_range() -> None:
+    with pytest.raises(ValueError, match="signing failed"):
+        sign(private_key=TEST_PRIVATE_KEY, msg_hash=2**251, seed=123)
+
+
+def test_verify_rejects_message_hash_out_of_range() -> None:
+    r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    with pytest.raises(ValueError, match="verification failed"):
+        verify(public_key=TEST_PUBLIC_KEY, msg_hash=2**251, r=r, s=s)
+
+
+def test_concurrent_calls_match_serial_results() -> None:
+    # The Rust functions release the GIL; results must be unaffected when
+    # they run on several threads at once.
+    msg_hashes = list(range(1, 33))
+    expected = [sign(TEST_PRIVATE_KEY, m, 123) for m in msg_hashes]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        actual = list(pool.map(lambda m: sign(TEST_PRIVATE_KEY, m, 123), msg_hashes))
+    assert actual == expected
+    assert all(
+        verify(TEST_PUBLIC_KEY, m, r, s)
+        for m, (r, s) in zip(msg_hashes, actual, strict=True)
+    )
