@@ -114,6 +114,13 @@ def test_out_of_range_input_raises_value_error(value: int) -> None:
         get_public_key(value)
 
 
+def test_invalid_private_key_is_not_echoed_in_error() -> None:
+    secret = FIELD_PRIME + 0xC0FFEE
+    with pytest.raises(ValueError) as exc_info:
+        sign(private_key=secret, msg_hash=4660, seed=123)
+    assert hex(secret)[2:] not in str(exc_info.value).lower()
+
+
 def test_sign_rejects_message_hash_out_of_range() -> None:
     with pytest.raises(ValueError, match="signing failed"):
         sign(private_key=TEST_PRIVATE_KEY, msg_hash=2**251, seed=123)

@@ -9,7 +9,7 @@ use starknet_crypto::{
 
 fn _fe_from_str(s: &str) -> PyResult<FieldElement> {
     FieldElement::from_hex_be(s)
-        .map_err(|e| PyValueError::new_err(format!("invalid field element {s:?}: {e}")))
+        .map_err(|e| PyValueError::new_err(format!("invalid field element: {e}")))
 }
 
 #[pyfunction]
