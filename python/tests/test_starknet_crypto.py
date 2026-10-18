@@ -1,5 +1,13 @@
+from collections.abc import Callable
+
 import pytest
 from starknet_crypto_py import get_public_key, pedersen_hash, sign, verify
+from starknet_crypto_py.starknet_crypto_py import (
+    rs_get_public_key,
+    rs_pedersen_hash,
+    rs_sign,
+    rs_verify,
+)
 
 TEST_PRIVATE_KEY = (
     2708384690123958484688745363115889726043588718997906908187752842753359350371
@@ -57,3 +65,21 @@ def test_sign_and_verify() -> None:
     (r, s) = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
     is_valid = verify(public_key=TEST_PUBLIC_KEY, msg_hash=4660, r=r, s=s)
     assert is_valid
+
+
+@pytest.mark.parametrize(
+    "fn, args",
+    [
+        (rs_get_public_key, ("0xzz",)),
+        (rs_pedersen_hash, ("0xzz", "0x1")),
+        (rs_pedersen_hash, ("0x1", "0xzz")),
+        (rs_sign, ("0xzz", "0x1234", "0x7b")),
+        (rs_sign, ("0x1", "0xzz", "0x7b")),
+        (rs_sign, ("0x1", "0x1234", "0xzz")),
+        (rs_verify, ("0xzz", "0x1", "0x1", "0x1")),
+        (rs_verify, ("0x1", "0x1", "0x1", "0xzz")),
+    ],
+)
+def test_invalid_hex_raises_value_error(fn: Callable[..., object], args: tuple[str, ...]) -> None:
+    with pytest.raises(ValueError, match="invalid field element"):
+        fn(*args)
