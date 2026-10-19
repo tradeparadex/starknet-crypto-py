@@ -5,6 +5,7 @@ use starknet_crypto::{
     pedersen_hash as pedersen_hash_rs,
     sign as sign_rs,
     rfc6979_generate_k as rfc6979_generate_k_rs,
+    VerifyError,
 };
 use starknet_curve::curve_params::{ALPHA, BETA, EC_ORDER, GENERATOR};
 use starknet_types_core::curve::{AffinePoint, ProjectivePoint};
@@ -14,15 +15,6 @@ use starknet_types_core::felt::NonZeroFelt;
 const ELEMENT_UPPER_BOUND: Felt =
     Felt::from_hex_unchecked("0x800000000000000000000000000000000000000000000000000000000000000");
 const EC_ORDER_NZ: NonZeroFelt = NonZeroFelt::from_felt_unchecked(EC_ORDER);
-
-fn _hex_nibble(c: u8) -> Option<u8> {
-    match c {
-        b'0'..=b'9' => Some(c - b'0'),
-        b'a'..=b'f' => Some(c - b'a' + 10),
-        b'A'..=b'F' => Some(c - b'A' + 10),
-        _ => None,
-    }
-}
 
 // Parses big-endian hex the way starknet-ff's `FieldElement::from_hex_be` did.
 // `Felt::from_hex` reduces values >= the field prime instead of rejecting
@@ -39,10 +31,11 @@ fn _fe_from_str(s: &str) -> PyResult<Felt> {
 
     let mut bytes = [0u8; 32];
     for (byte, pair) in bytes.iter_mut().zip(padded.chunks_exact(2)) {
-        let (Some(hi), Some(lo)) = (_hex_nibble(pair[0]), _hex_nibble(pair[1])) else {
+        let (Some(hi), Some(lo)) = (char::from(pair[0]).to_digit(16), char::from(pair[1]).to_digit(16))
+        else {
             return Err(invalid("invalid character"));
         };
-        *byte = (hi << 4) | lo;
+        *byte = ((hi << 4) | lo) as u8;
     }
 
     if bytes > Felt::MAX.to_bytes_be() {
@@ -95,36 +88,42 @@ fn rs_verify(public_key: &str, msg_hash: &str, r: &str, s: &str) -> PyResult<boo
     let message: Felt = _fe_from_str(msg_hash)?;
     let r: Felt = _fe_from_str(r)?;
     let s: Felt = _fe_from_str(s)?;
-    _verify(&public_key, &message, &r, &s)
+    // An out-of-range message hash, r or s means the signature is not valid,
+    // not that the call was malformed; only an unusable public key raises.
+    match _verify(&public_key, &message, &r, &s) {
+        Ok(result) => Ok(result),
+        Err(
+            VerifyError::InvalidMessageHash | VerifyError::InvalidR | VerifyError::InvalidS,
+        ) => Ok(false),
+        Err(e @ VerifyError::InvalidPublicKey) => {
+            Err(PyValueError::new_err(format!("verification failed: {e}")))
+        }
+    }
 }
 
 // Same steps as `starknet_crypto::verify` 0.8.1, which unwraps `to_affine()`
 // and so panics when zw*G +/- rw*Q is the point at infinity; inputs can force
 // that. Such a signature is reported as invalid, as 0.6 did.
-// An out-of-range message hash, r or s means the signature is not valid, not
-// that the call was malformed; only an unusable public key raises.
-fn _verify(public_key: &Felt, message: &Felt, r: &Felt, s: &Felt) -> PyResult<bool> {
+fn _verify(public_key: &Felt, message: &Felt, r: &Felt, s: &Felt) -> Result<bool, VerifyError> {
     if message >= &ELEMENT_UPPER_BOUND {
-        return Ok(false);
+        return Err(VerifyError::InvalidMessageHash);
     }
     if r == &Felt::ZERO || r >= &ELEMENT_UPPER_BOUND {
-        return Ok(false);
+        return Err(VerifyError::InvalidR);
     }
     if s == &Felt::ZERO || s >= &ELEMENT_UPPER_BOUND {
-        return Ok(false);
+        return Err(VerifyError::InvalidS);
     }
 
-    let invalid_public_key = || PyValueError::new_err("verification failed: Invalid public key");
     let y = (public_key.square() * public_key + ALPHA * public_key + BETA)
         .sqrt()
-        .ok_or_else(invalid_public_key)?;
-    let full_public_key = AffinePoint::new(*public_key, y).map_err(|_| invalid_public_key())?;
+        .ok_or(VerifyError::InvalidPublicKey)?;
+    let full_public_key =
+        AffinePoint::new(*public_key, y).map_err(|_| VerifyError::InvalidPublicKey)?;
 
-    let Some(w) = s.mod_inverse(&EC_ORDER_NZ) else {
-        return Ok(false);
-    };
+    let w = s.mod_inverse(&EC_ORDER_NZ).ok_or(VerifyError::InvalidS)?;
     if w == Felt::ZERO || w >= ELEMENT_UPPER_BOUND {
-        return Ok(false);
+        return Err(VerifyError::InvalidS);
     }
 
     let zw = message.mul_mod(&w, &EC_ORDER_NZ);
