@@ -36,7 +36,7 @@ python = ">=3.10"
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.3"
 maturin = "^1.10.2"
-mypy = "^1.19.0"
+mypy = "^2.4.0"
 ruff = "^0.14.7"
 ziglang = { version = "^0.15.1", python = "<4.0" }
 tox = "^4.32.0"
