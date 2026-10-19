@@ -18,6 +18,8 @@ TEST_PUBLIC_KEY = (
 )
 # Starknet field prime: the smallest value that is not a valid field element.
 FIELD_PRIME = 2**251 + 17 * 2**192 + 1
+# No point on the Stark curve has this x-coordinate.
+NOT_ON_CURVE_X = 5
 
 
 def test_get_public_key() -> None:
@@ -126,15 +128,25 @@ def test_sign_rejects_message_hash_out_of_range() -> None:
         sign(private_key=TEST_PRIVATE_KEY, msg_hash=2**251, seed=123)
 
 
-def test_verify_rejects_message_hash_out_of_range() -> None:
+@pytest.mark.parametrize(
+    "field, value",
+    [("msg_hash", 2**251), ("r", 0), ("r", 2**251), ("s", 0), ("s", 2**251)],
+)
+def test_verify_returns_false_for_out_of_range_values(field: str, value: int) -> None:
+    r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    args = {"public_key": TEST_PUBLIC_KEY, "msg_hash": 4660, "r": r, "s": s}
+    args[field] = value
+    assert verify(**args) is False
+
+
+def test_verify_raises_for_public_key_not_on_curve() -> None:
     r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
     with pytest.raises(ValueError, match="verification failed"):
-        verify(public_key=TEST_PUBLIC_KEY, msg_hash=2**251, r=r, s=s)
+        verify(public_key=NOT_ON_CURVE_X, msg_hash=4660, r=r, s=s)
 
 
 def test_concurrent_calls_match_serial_results() -> None:
-    # The Rust functions release the GIL; results must be unaffected when
-    # they run on several threads at once.
+    # Results must be unaffected when the module is used from several threads.
     msg_hashes = list(range(1, 33))
     expected = [sign(TEST_PRIVATE_KEY, m, 123) for m in msg_hashes]
     with ThreadPoolExecutor(max_workers=8) as pool:
