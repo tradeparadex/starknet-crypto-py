@@ -20,6 +20,9 @@ TEST_PUBLIC_KEY = (
 FIELD_PRIME = 2**251 + 17 * 2**192 + 1
 # No point on the Stark curve has this x-coordinate.
 NOT_ON_CURVE_X = 5
+# Order of the Stark curve and x-coordinate of its generator G.
+EC_ORDER = 0x800000000000010FFFFFFFFFFFFFFFFB781126DCAE7B2321E66A241ADC64D2F
+GENERATOR_X = 0x1EF15C18599971B7BECED415A40F0C7DEACFD9B0D1819E03D723D8BC943CFCA
 
 
 def test_get_public_key() -> None:
@@ -156,3 +159,38 @@ def test_concurrent_calls_match_serial_results() -> None:
         verify(TEST_PUBLIC_KEY, m, r, s)
         for m, (r, s) in zip(msg_hashes, actual, strict=True)
     )
+
+
+# Inputs below make an intermediate point the point at infinity, where
+# starknet-crypto 0.8 panics. A panic would abort the interpreter.
+
+
+def test_get_public_key_of_zero_is_zero() -> None:
+    assert get_public_key(0) == 0
+
+
+def test_get_public_key_of_curve_order_is_zero() -> None:
+    assert get_public_key(EC_ORDER) == 0
+
+
+def test_get_public_key_of_one_is_generator() -> None:
+    assert get_public_key(1) == GENERATOR_X
+
+
+@pytest.mark.parametrize(
+    "msg_hash, r",
+    [
+        # zw*G + rw*G is the point at infinity when z + r == EC_ORDER.
+        (2**251 - 1, EC_ORDER - (2**251 - 1)),
+        # zw*G - rw*G is the point at infinity when z == r.
+        (12345, 12345),
+    ],
+)
+def test_verify_returns_false_when_point_is_at_infinity(msg_hash: int, r: int) -> None:
+    assert verify(public_key=GENERATOR_X, msg_hash=msg_hash, r=r, s=1) is False
+
+
+def test_verify_accepts_valid_signature_on_zero_message_hash() -> None:
+    # 0.6 mishandled zw*G at infinity and rejected these valid signatures.
+    r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=0, seed=123)
+    assert verify(public_key=TEST_PUBLIC_KEY, msg_hash=0, r=r, s=s)
