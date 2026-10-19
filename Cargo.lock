@@ -449,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "starknet-crypto-py"
-version = "0.3.1"
+version = "0.3.0"
 dependencies = [
  "pyo3",
  "starknet-crypto",
