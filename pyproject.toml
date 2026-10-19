@@ -4,11 +4,17 @@ build-backend = "maturin"
 
 [project]
 name = "starknet-crypto-py"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version"]
 
@@ -25,15 +31,14 @@ license = "MIT"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.14"
-ziglang = "^0.15.1"
+python = ">=3.10"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.1"
 maturin = "^1.10.2"
 mypy = "^1.19.0"
 ruff = "^0.14.7"
-ziglang = "^0.15.1"
+ziglang = { version = "^0.15.1", python = "<4.0" }
 tox = "^4.32.0"
 
 [tool.mypy]

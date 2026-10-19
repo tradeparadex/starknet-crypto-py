@@ -1,5 +1,14 @@
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 from starknet_crypto_py import get_public_key, pedersen_hash, sign, verify
+from starknet_crypto_py.starknet_crypto_py import (
+    rs_get_public_key,
+    rs_pedersen_hash,
+    rs_sign,
+    rs_verify,
+)
 
 TEST_PRIVATE_KEY = (
     2708384690123958484688745363115889726043588718997906908187752842753359350371
@@ -7,6 +16,10 @@ TEST_PRIVATE_KEY = (
 TEST_PUBLIC_KEY = (
     1673729114437878727516854592246827335452530539480870878860719335128967723895
 )
+# Starknet field prime: the smallest value that is not a valid field element.
+FIELD_PRIME = 2**251 + 17 * 2**192 + 1
+# No point on the Stark curve has this x-coordinate.
+NOT_ON_CURVE_X = 5
 
 
 def test_get_public_key() -> None:
@@ -54,6 +67,92 @@ def test_pedersen_hash(first: int, second: int, msg_hash: int) -> None:
 
 
 def test_sign_and_verify() -> None:
-    (r, s) = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
     is_valid = verify(public_key=TEST_PUBLIC_KEY, msg_hash=4660, r=r, s=s)
     assert is_valid
+
+
+@pytest.mark.parametrize(
+    "fn, args",
+    [
+        (rs_get_public_key, ("0xzz",)),
+        (rs_pedersen_hash, ("0xzz", "0x1")),
+        (rs_pedersen_hash, ("0x1", "0xzz")),
+        (rs_sign, ("0xzz", "0x1234", "0x7b")),
+        (rs_sign, ("0x1", "0xzz", "0x7b")),
+        (rs_sign, ("0x1", "0x1234", "0xzz")),
+        (rs_verify, ("0xzz", "0x1", "0x1", "0x1")),
+        (rs_verify, ("0x1", "0x1", "0x1", "0xzz")),
+    ],
+)
+def test_invalid_hex_raises_value_error(
+    fn: Callable[..., object], args: tuple[str, ...]
+) -> None:
+    with pytest.raises(ValueError, match="invalid field element"):
+        fn(*args)
+
+
+def test_sign_is_deterministic() -> None:
+    first = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    second = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    assert first == second
+
+
+def test_verify_rejects_wrong_message() -> None:
+    r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    assert not verify(public_key=TEST_PUBLIC_KEY, msg_hash=4661, r=r, s=s)
+
+
+def test_verify_rejects_tampered_signature() -> None:
+    r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    assert not verify(public_key=TEST_PUBLIC_KEY, msg_hash=4660, r=r, s=s + 1)
+
+
+@pytest.mark.parametrize("value", [-1, FIELD_PRIME])
+def test_out_of_range_input_raises_value_error(value: int) -> None:
+    with pytest.raises(ValueError, match="invalid field element"):
+        pedersen_hash(value, 0)
+    with pytest.raises(ValueError, match="invalid field element"):
+        get_public_key(value)
+
+
+def test_invalid_private_key_is_not_echoed_in_error() -> None:
+    secret = FIELD_PRIME + 0xC0FFEE
+    with pytest.raises(ValueError) as exc_info:
+        sign(private_key=secret, msg_hash=4660, seed=123)
+    assert hex(secret)[2:] not in str(exc_info.value).lower()
+
+
+def test_sign_rejects_message_hash_out_of_range() -> None:
+    with pytest.raises(ValueError, match="signing failed"):
+        sign(private_key=TEST_PRIVATE_KEY, msg_hash=2**251, seed=123)
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [("msg_hash", 2**251), ("r", 0), ("r", 2**251), ("s", 0), ("s", 2**251)],
+)
+def test_verify_returns_false_for_out_of_range_values(field: str, value: int) -> None:
+    r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    args = {"public_key": TEST_PUBLIC_KEY, "msg_hash": 4660, "r": r, "s": s}
+    args[field] = value
+    assert verify(**args) is False
+
+
+def test_verify_raises_for_public_key_not_on_curve() -> None:
+    r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
+    with pytest.raises(ValueError, match="verification failed"):
+        verify(public_key=NOT_ON_CURVE_X, msg_hash=4660, r=r, s=s)
+
+
+def test_concurrent_calls_match_serial_results() -> None:
+    # Results must be unaffected when the module is used from several threads.
+    msg_hashes = list(range(1, 33))
+    expected = [sign(TEST_PRIVATE_KEY, m, 123) for m in msg_hashes]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        actual = list(pool.map(lambda m: sign(TEST_PRIVATE_KEY, m, 123), msg_hashes))
+    assert actual == expected
+    assert all(
+        verify(TEST_PUBLIC_KEY, m, r, s)
+        for m, (r, s) in zip(msg_hashes, actual, strict=True)
+    )
