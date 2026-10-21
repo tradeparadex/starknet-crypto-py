@@ -11,9 +11,6 @@ use starknet_curve::curve_params::{ALPHA, BETA, EC_ORDER, GENERATOR};
 use starknet_types_core::curve::{AffinePoint, ProjectivePoint};
 use starknet_types_core::felt::NonZeroFelt;
 
-// Exclusive upper bound on the message hash, r, s and w in ECDSA (2**251).
-const ELEMENT_UPPER_BOUND: Felt =
-    Felt::from_hex_unchecked("0x800000000000000000000000000000000000000000000000000000000000000");
 const EC_ORDER_NZ: NonZeroFelt = NonZeroFelt::from_felt_unchecked(EC_ORDER);
 
 // Parses big-endian hex the way starknet-ff's `FieldElement::from_hex_be` did.
@@ -105,13 +102,13 @@ fn rs_verify(public_key: &str, msg_hash: &str, r: &str, s: &str) -> PyResult<boo
 // and so panics when zw*G +/- rw*Q is the point at infinity; inputs can force
 // that. Such a signature is reported as invalid, as 0.6 did.
 fn _verify(public_key: &Felt, message: &Felt, r: &Felt, s: &Felt) -> Result<bool, VerifyError> {
-    if message >= &ELEMENT_UPPER_BOUND {
+    if message >= &Felt::ELEMENT_UPPER_BOUND {
         return Err(VerifyError::InvalidMessageHash);
     }
-    if r == &Felt::ZERO || r >= &ELEMENT_UPPER_BOUND {
+    if r == &Felt::ZERO || r >= &Felt::ELEMENT_UPPER_BOUND {
         return Err(VerifyError::InvalidR);
     }
-    if s == &Felt::ZERO || s >= &ELEMENT_UPPER_BOUND {
+    if s == &Felt::ZERO || s >= &Felt::ELEMENT_UPPER_BOUND {
         return Err(VerifyError::InvalidS);
     }
 
@@ -121,8 +118,15 @@ fn _verify(public_key: &Felt, message: &Felt, r: &Felt, s: &Felt) -> Result<bool
     let full_public_key =
         AffinePoint::new(*public_key, y).map_err(|_| VerifyError::InvalidPublicKey)?;
 
+    // Unlike upstream, a zero message hash never verifies: StarkWare's
+    // crypto-cpp rejects it, and so did 0.6. Checked after the public key so an
+    // invalid key still raises, as it did in 0.6.
+    if message == &Felt::ZERO {
+        return Err(VerifyError::InvalidMessageHash);
+    }
+
     let w = s.mod_inverse(&EC_ORDER_NZ).ok_or(VerifyError::InvalidS)?;
-    if w == Felt::ZERO || w >= ELEMENT_UPPER_BOUND {
+    if w == Felt::ZERO || w >= Felt::ELEMENT_UPPER_BOUND {
         return Err(VerifyError::InvalidS);
     }
 

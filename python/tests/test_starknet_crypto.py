@@ -142,10 +142,12 @@ def test_verify_returns_false_for_out_of_range_values(field: str, value: int) ->
     assert verify(**args) is False
 
 
-def test_verify_raises_for_public_key_not_on_curve() -> None:
+@pytest.mark.parametrize("msg_hash", [4660, 0])
+def test_verify_raises_for_public_key_not_on_curve(msg_hash: int) -> None:
+    # A zero message hash is rejected only after the public key is checked.
     r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
     with pytest.raises(ValueError, match="verification failed"):
-        verify(public_key=NOT_ON_CURVE_X, msg_hash=4660, r=r, s=s)
+        verify(public_key=NOT_ON_CURVE_X, msg_hash=msg_hash, r=r, s=s)
 
 
 def test_concurrent_calls_match_serial_results() -> None:
@@ -190,10 +192,10 @@ def test_verify_returns_false_when_point_is_at_infinity(msg_hash: int, r: int) -
     assert verify(public_key=GENERATOR_X, msg_hash=msg_hash, r=r, s=1) is False
 
 
-def test_verify_accepts_valid_signature_on_zero_message_hash() -> None:
-    # 0.6 mishandled zw*G at infinity and rejected these valid signatures.
+def test_verify_rejects_zero_message_hash() -> None:
+    # StarkWare's crypto-cpp rejects a zero message hash, and so did 0.6.
     r, s = sign(private_key=TEST_PRIVATE_KEY, msg_hash=0, seed=123)
-    assert verify(public_key=TEST_PUBLIC_KEY, msg_hash=0, r=r, s=s)
+    assert verify(public_key=TEST_PUBLIC_KEY, msg_hash=0, r=r, s=s) is False
 
 
 # Golden values produced by the 0.6.1 build, to pin exact output across upgrades.
@@ -250,7 +252,8 @@ def test_verify_accepts_valid_signature_on_zero_message_hash() -> None:
 def test_sign_matches_known_vectors(private_key: int, msg_hash: int, seed: int, expected: tuple[int, int]) -> None:
     assert sign(private_key=private_key, msg_hash=msg_hash, seed=seed) == expected
     public_key = get_public_key(private_key)
-    assert verify(public_key=public_key, msg_hash=msg_hash, r=expected[0], s=expected[1])
+    # A zero message hash never verifies; see test_verify_rejects_zero_message_hash.
+    assert verify(public_key=public_key, msg_hash=msg_hash, r=expected[0], s=expected[1]) is (msg_hash != 0)
 
 
 @pytest.mark.parametrize(
@@ -279,9 +282,13 @@ def test_sign_and_verify_across_keys(private_key: int) -> None:
 
 def test_verify_returns_false_when_inverse_of_s_is_out_of_range() -> None:
     # w = s^-1 mod EC_ORDER must be below 2**251; this s has w == 2**251.
+    # msg_hash is chosen so that (z + r*d) * w == 2, so R = 2G and the
+    # signature would verify if the range check on w were missing.
     s = pow(2**251, -1, EC_ORDER)
-    r, _ = sign(private_key=TEST_PRIVATE_KEY, msg_hash=4660, seed=123)
-    assert verify(public_key=TEST_PUBLIC_KEY, msg_hash=4660, r=r, s=s) is False
+    r = get_public_key(2)
+    msg_hash = (2 * s - r * TEST_PRIVATE_KEY) % EC_ORDER
+    assert msg_hash < 2**251
+    assert verify(public_key=TEST_PUBLIC_KEY, msg_hash=msg_hash, r=r, s=s) is False
 
 
 # Hex parsing must match starknet-ff's `from_hex_be`, which the 0.6 build used.
