@@ -475,7 +475,7 @@ dependencies = [
  "rfc6979",
  "sha2",
  "starknet-curve",
- "starknet-types-core",
+ "starknet-types-core 0.2.2",
  "zeroize",
 ]
 
@@ -486,7 +486,7 @@ dependencies = [
  "pyo3",
  "starknet-crypto",
  "starknet-curve",
- "starknet-types-core",
+ "starknet-types-core 0.3.0",
 ]
 
 [[package]]
@@ -495,7 +495,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22c898ae81b6409532374cf237f1bd752d068b96c6ad500af9ebbd0d9bb712f6"
 dependencies = [
- "starknet-types-core",
+ "starknet-types-core 0.2.2",
 ]
 
 [[package]]
@@ -514,6 +514,18 @@ dependencies = [
  "rand 0.9.5",
  "serde",
  "zeroize",
+]
+
+[[package]]
+name = "starknet-types-core"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63348f4e18f318045f7d1bfddac8b99618dc1005c89ebc71ae82593b76fd3ade"
+dependencies = [
+ "lambdaworks-math",
+ "num-bigint",
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]
